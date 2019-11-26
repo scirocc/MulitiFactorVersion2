@@ -47,13 +47,11 @@ def getStockDayLineFromDb(sub_sCode,startdate,endDate):
     for code in sub_sCode:
         if code[0]=='6':tablename='sh_day'
         else:tablename='sz_day'
-        sql='select mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor' \
-            ' from {} where(code=\'{}\')and(mdate<=\'{}\')order by mdate desc'\
+        sql='select closeprice,reweightfactor from {} where(code=\'{}\')and(mdate<=\'{}\')order by mdate desc'\
                     .format(tablename,code,startdate)
         cursor.execute(sql)
-        mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor=cursor.fetchone()
-
-        hCodeInitInfo[code]=[closeprice,amount/volume,volume,amount,closeprice*reweightfactor,amount/volume*reweightfactor]
+        closeprice,reweightfactor=cursor.fetchone()
+        hCodeInitInfo[code]=[closeprice,closeprice*reweightfactor]
         sqlstring = 'select mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor' \
                     ' from {} where(code=\'{}\')and(mdate>=\'{}\')and(mdate<=\'{}\')order by mdate'\
                     .format(tablename,code,startdate,endDate)
@@ -61,13 +59,13 @@ def getStockDayLineFromDb(sub_sCode,startdate,endDate):
         data=cursor.fetchall()
         hDateInfo=dict(map(dealData,data))
         hCodeDateInfo[code]=hDateInfo
-    with open('../Data/hCodeInitInfo','wb')as f:pickle.dump(hCodeInitInfo,f)
     conn.close()
-    return (hCodeDateInfo)
+    return (hCodeDateInfo,hCodeInitInfo)
 
 
-def genFile(hCodeDateInfo):
-    with open('../Data/hCodeInitInfo','rb')as f:hCodeInitInfo=pickle.load(f)
+def genFile(hResult):
+    hCodeDateInfo=hResult['hCodeDateInfo']
+    hCodeInitInfo=hResult['hCodeInitInfo']
     #把hCodeDateInfo的停牌日的price补上
     with open('../Data/hCodeInitDate','rb')as f:hCodeInitDate=pickle.load(f)
     with open('../Data/hCodeDelistingDate','rb')as f:hCodeDelistingDate=pickle.load(f)
@@ -78,18 +76,24 @@ def genFile(hCodeDateInfo):
         initT=hCodeInitDate[code]
         delistT=hCodeDelistingDate[code]
         sDate4code=list(filter(lambda date:initT<=date<=delistT,sDate))
-        for i in range(sDate4code):
+        for i in range(len(sDate4code)):
             date=sDate4code[i]
             if i==0:
-                price=hCodeInitPrice[code]
-                oldPrice = price
+                try:
+                    info=hDateInfo[date]#c,aver,vol,amount,re_c,re_aver
+                except:
+                    c,reweightFactor=hCodeInitInfo[code]
+                    info=[c,0,0,0,c*reweightFactor,0]
+                h[code][date] = info
             else:
-                try:#第一天保证有值
-                    price=hCodeInitPrice[code]
-                    oldPrice =price
-                except:#没值时取上一个日子的值
-                    price=oldPrice
-            h[code][date]=price
+                try:
+                    info=hDateInfo[date]#c,aver,vol,amount,re_c,re_aver
+                except:
+                    c=oldInfo[0]
+                    reweightFactor=oldInfo[-2]
+                    info=[c,0,0,0,c*reweightFactor,0]
+            h[code][date] = info
+            oldInfo = info
     hDateCodeInfo=tool.NestDictTransfer(h)
     sDate=sorted(hDateCodeInfo)
     def dealdata(date):
@@ -102,8 +106,17 @@ def genFile(hCodeDateInfo):
 
 def mp_stuff(sSubsCode,sPara,hResultOfshareMemo):
     startdate, endDate=sPara
-    hCodeDateInfo=getStockDayLineFromDb(sSubsCode, startdate, endDate)
-    hResultOfshareMemo.update(hCodeDateInfo)
+    hCodeDateInfo,hCodeInitInfo=getStockDayLineFromDb(sSubsCode, startdate, endDate)
+    try:
+        hResultOfshareMemo['hCodeDateInfo'].update(hCodeDateInfo)
+    except:
+        hResultOfshareMemo['hCodeDateInfo']={}
+        hResultOfshareMemo['hCodeDateInfo'].update(hCodeDateInfo)
+    try:
+        hResultOfshareMemo['hCodeInitInfo'].update(hCodeInitInfo)
+    except:
+        hResultOfshareMemo['hCodeInitInfo']={}
+        hResultOfshareMemo['hCodeInitInfo'].update(hCodeInitInfo)
     return 0
 
 def main(startdate,endDate):
