@@ -1,12 +1,11 @@
 # coding=utf-8
-import requests,time,pickle,glob
+import requests,time,pickle
 import threading as td
 import queue
 
 
 def get_sCode():
-    sFile=glob.glob('E:\pyProjectData\MultiFactor\Data\stockDayLine/*.csv')
-    sCode=[x[-10:-4] for x in sFile]
+    with open('../Data/sCode','wb')as f:sCode=pickle.load(f)
     return(sCode)
 
 def divide_to_subsCode(sCode,num_of_mp):
@@ -180,9 +179,9 @@ def main(endT,nums_of_td):
     hCodeDateActualTradableShare,hCodeIndus,hCodeDelistingDate=dealWithInfo(q)
     time3=time.time()
     print('dealing data takes time {}seconds'.format(time3-time2))
-    with open('E:\pyProjectData\MultiFactor\Data/hCodeDateActualTradableShare.txt','w')as f:pickle.dump(hCodeDateActualTradableShare,f)
-    with open('E:\pyProjectData\MultiFactor\Data/hCodeIndus.txt','w')as f:pickle.dump(hCodeIndus,f)
-    with open('E:\pyProjectData\MultiFactor\Data/hCodeDelistingDate.txt','w')as f:pickle.dump(hCodeDelistingDate,f)
+    with open('../Data/hCodeDateActualTradableShare','wb')as f:pickle.dump(hCodeDateActualTradableShare,f)
+    with open('../Data/hCodeIndus','wb')as f:pickle.dump(hCodeIndus,f)
+    with open('../Data/hCodeDelistingDate','wb')as f:pickle.dump(hCodeDelistingDate,f)
     return 0
 
 

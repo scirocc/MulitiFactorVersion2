@@ -19,6 +19,7 @@ def gen_sCode(beginT,endT):
     temp2=[x[0] for x in data]
     sCode=temp1+temp2
     conn.close()
+    with open('../Data/sCode','wb')as f:pickle.dump(sCode,f)
     return(sCode)
 
 def getStockDayLineFromDb(sub_sCode,startdate,endDate):
@@ -26,9 +27,18 @@ def getStockDayLineFromDb(sub_sCode,startdate,endDate):
         if data:
             mdate, openprice, highprice, lowprice, closeprice, volume, amount, reweightfactor=data
             averPrice=amount/volume
-            rehabilitationClosePrice=closeprice*reweightfactor
-            rehabilitationAverPrice=averPrice*reweightfactor
-            return(mdate,[closeprice,averPrice,volume,amount,rehabilitationClosePrice,rehabilitationAverPrice])
+            try:
+                rehabilitationClosePrice=closeprice*reweightfactor
+                rehabilitationAverPrice=averPrice*reweightfactor
+            except:
+                rehabilitationClosePrice = closeprice
+                rehabilitationAverPrice = averPrice
+            return(mdate,[round(closeprice,2),
+                          round(averPrice,2),
+                          round(volume,2),
+                          round(amount,2),
+                          round(rehabilitationClosePrice,2),
+                          round(rehabilitationAverPrice,2)])
 
     conn = cx.connect('market/1@192.168.0.8:1521/orcl')
     cursor = conn.cursor()
@@ -51,11 +61,11 @@ def genFile(hCodeDateInfo):
     hDateCodeInfo=tool.NestDictTransfer(hCodeDateInfo)
     sDate=sorted(hDateCodeInfo)
     def dealdata(date):
-        hCodeInfo=hDateCodeInfo(date)
-        with open('../data/dayline/hCodeInfoOf{}'.format(date),'w')as f:pickle.dump(hCodeInfo,f)
+        hCodeInfo=hDateCodeInfo[date]
+        with open('../Data/dayline/hCodeInfoOf{}'.format(date),'wb')as f:pickle.dump(hCodeInfo,f)
         return 0
     list(map(dealdata,sDate))
-    with open('../data/sDate','w')as f:pickle.dump(sDate,f)
+    with open('../Data/sDate','wb')as f:pickle.dump(sDate,f)
     return 0
 
 def mp_stuff(sSubsCode,sPara,hResultOfshareMemo):
@@ -65,7 +75,7 @@ def mp_stuff(sSubsCode,sPara,hResultOfshareMemo):
     return 0
 
 def main(startdate,endDate):
-    try:os.makedirs('../data/dayline/')
+    try:os.makedirs('../Data/dayline/')
     except:pass
     #main 只能由其他文件导入并限制在if name==main条件下
     now1=datetime.datetime.now()
@@ -73,12 +83,12 @@ def main(startdate,endDate):
     now2=datetime.datetime.now()
     print('下载数据花费时间为：',now2-now1)
     sPara=[startdate,endDate]
-    hResultOfshareMemo=myFrame.main(sCode,mp_stuff,sPara)
-    genFile(hResultOfshareMemo)
+    hResult=myFrame.main(sCode,mp_stuff,sPara,8)
+    genFile(hResult)
     now3 = datetime.datetime.now()
     print('整理股票数据花费时间为：',now3-now2)
     return 0
 #
-# if __name__=='__main__':
-#     main(20090601,20190601)
+if __name__=='__main__':
+    main(20090601,20190601)
 

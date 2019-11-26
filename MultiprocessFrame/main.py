@@ -15,6 +15,7 @@ def fun(i,sParaOfshareMemory,hResultOfshareMemo):
     af.set_process_affinity_mask(os.getpid(),pow(2,i))# 邦核
     sSUBsList,dealFunc,sPara=sParaOfshareMemory
     sSub=sSUBsList[i]
+    print('{} is ready to do dealfunc'.format(i+1))
     dealFunc(sSub,sPara,hResultOfshareMemo)
     print('process{} done'.format(i+1))
     return 0
@@ -41,7 +42,8 @@ def main(sList,dealFunc,sPara,numOfCores=psutil.cpu_count(logical = False)):
         for mp123 in sMP:mp123.join()
         time3=time.time()
         print('running multiprocess takes {} seconds'.format(time3-time2))
-    return (hResultOfshareMemo)
+        x=dict(hResultOfshareMemo)
+    return (x)
 
 
 
