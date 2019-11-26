@@ -43,9 +43,17 @@ def getStockDayLineFromDb(sub_sCode,startdate,endDate):
     conn = cx.connect('market/1@192.168.0.8:1521/orcl')
     cursor = conn.cursor()
     hCodeDateInfo={}
+    hCodeInitInfo={}
     for code in sub_sCode:
         if code[0]=='6':tablename='sh_day'
         else:tablename='sz_day'
+        sql='select mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor' \
+            ' from {} where(code=\'{}\')and(mdate<=\'{}\')order by mdate desc'\
+                    .format(tablename,code,startdate)
+        cursor.execute(sql)
+        mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor=cursor.fetchone()
+
+        hCodeInitInfo[code]=[closeprice,amount/volume,volume,amount,closeprice*reweightfactor,amount/volume*reweightfactor]
         sqlstring = 'select mdate,openprice,highprice,lowprice,closeprice,volume,amount,reweightfactor' \
                     ' from {} where(code=\'{}\')and(mdate>=\'{}\')and(mdate<=\'{}\')order by mdate'\
                     .format(tablename,code,startdate,endDate)
@@ -53,12 +61,36 @@ def getStockDayLineFromDb(sub_sCode,startdate,endDate):
         data=cursor.fetchall()
         hDateInfo=dict(map(dealData,data))
         hCodeDateInfo[code]=hDateInfo
+    with open('../Data/hCodeInitInfo','wb')as f:pickle.dump(hCodeInitInfo,f)
     conn.close()
     return (hCodeDateInfo)
 
 
 def genFile(hCodeDateInfo):
-    hDateCodeInfo=tool.NestDictTransfer(hCodeDateInfo)
+    with open('../Data/hCodeInitInfo','rb')as f:hCodeInitInfo=pickle.load(f)
+    #把hCodeDateInfo的停牌日的price补上
+    with open('../Data/hCodeInitDate','rb')as f:hCodeInitDate=pickle.load(f)
+    with open('../Data/hCodeDelistingDate','rb')as f:hCodeDelistingDate=pickle.load(f)
+    h={}
+    sDate=sorted(set([date for hDateinfo in hCodeDateInfo.values() for date in hDateinfo]))
+    for code,hDateInfo in hCodeDateInfo.items():
+        h[code]={}
+        initT=hCodeInitDate[code]
+        delistT=hCodeDelistingDate[code]
+        sDate4code=list(filter(lambda date:initT<=date<=delistT,sDate))
+        for i in range(sDate4code):
+            date=sDate4code[i]
+            if i==0:
+                price=hCodeInitPrice[code]
+                oldPrice = price
+            else:
+                try:#第一天保证有值
+                    price=hCodeInitPrice[code]
+                    oldPrice =price
+                except:#没值时取上一个日子的值
+                    price=oldPrice
+            h[code][date]=price
+    hDateCodeInfo=tool.NestDictTransfer(h)
     sDate=sorted(hDateCodeInfo)
     def dealdata(date):
         hCodeInfo=hDateCodeInfo[date]
