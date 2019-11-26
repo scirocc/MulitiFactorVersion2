@@ -4,12 +4,10 @@ import pickle
 from functools import reduce
 
 def main(hDayCodePrice):
-    with open('../Data/hCodeDelistingDate','rb')as f:
-        hCodeDelistingDate=pickle.load(f)
     sDate=sorted(hDayCodePrice)
     #生成sEndT
     sEndT=sDate[slice(0,len(sDate),20)]
-    ################################
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''
     hMonthCodeYield={}
     def dealfunc(oldDate,Date):
         hCodePrice1 = hDayCodePrice[oldDate]
