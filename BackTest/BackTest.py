@@ -23,14 +23,18 @@ class BackTestBase(object):
     def ReadDayMarket(self,sonConn):
         while True:
             date=sonConn.recv()
-            with open('../Data/dayline/hCodeInfoOf{}'.format(date), 'rb')as f: hCodeInfo = pickle.load(f)
-            sonConn.send(hCodeInfo)
+            if date:
+                with open('../Data/dayline/hCodeInfoOf{}'.format(date), 'rb')as f: hCodeInfo = pickle.load(f)
+                sonConn.send(hCodeInfo)
+            else:
+                sonConn.close()
 
     #多进程函数
     def backtestAsGenerator(self):
         fatherConn,sonConn=mp.Pipe()
         readProcess=mp.Process(target=self.ReadDayMarket,args=(sonConn,))#声明独立读取的异步函数
-        LocOfLast = len(self.sDate) - 1
+        readProcess.start()
+        sNet=[]
         for j, date in enumerate(self.sDate):
             if j == 1:  #如果是第一天的话，那么缓冲两天的数据
                 todayDate=oldDate
@@ -38,46 +42,24 @@ class BackTestBase(object):
                 fatherConn.send(todayDate)
                 self.dayMarket=fatherConn.recv()
                 fatherConn.send(nextDate)
-
-            slicingInfo = self.dayMarket
-            net = self.A4s.SliceingInfoAccepter.send(slicingInfo, todayDate)#发送
-
-
-
-
-
-
+                slicingInfo = self.dayMarket
+                net = self.A4s.SliceingInfoAccepter.send(slicingInfo, todayDate)  # 发送
+                sNet.append(net)
+            elif j:#若是其他的日期那么就缓冲一天就可以了
+                todayDate=oldDate
+                self.dayMarket = fatherConn.recv()
+                fatherConn.send(date)
+                slicingInfo = self.dayMarket
+                net = self.A4s.SliceingInfoAccepter.send(slicingInfo, todayDate)  # 发送
+                sNet.append(net)
             oldDate=date
-
-
-        # sNet=[]
-
-
-
-
-
-
-
-
-        LocOfLast =len(self.sDate)-1
-        for j,date in enumerate(self.sDate):
-            if j==0:#如果是第一天的话，那么缓冲两天的数据
-                self.dayMarket=self.ReadDayMarket(date)
-                mp.Process(target=self.ReadDayMarket,args=(self.sDate[self.sDate.index(date)+1],mpQ4nextday)).start()
-            elif j!=LocOfLast:
-                self.dayMarket=naNextDay
-                mp.Process(target=self.ReadDayMarket,args=(self.sDate[self.sDate.index(date)+1],mpQ4nextday)).start()
-            else:#读到最后一天了
-                self.dayMarket = naNextDay
-            for i,time in enumerate(self.sTime):
-                slicingInfo=self.dayMarket[i]
-                # 1.
-                # 向账户类发送市场信息，更新账户情况
-                time=date+time
-                net=self.A4s.SliceingInfoAccepter.send(slicingInfo,time)
-            sNet.append(net)
-            # naNextDay=mpQ4nextday.get()#注意一定是写在最后一行
-            oldDate=date
+        #然后再收最后一天的行情并发送结束标志，终止pipe
+        self.dayMarket = fatherConn.recv()
+        fatherConn.send(0)
+        slicingInfo = self.dayMarket
+        net = self.A4s.SliceingInfoAccepter.send(slicingInfo, date)  # 发送
+        sNet.append(net)
+        readProcess.join()
         return(sNet)
 
 

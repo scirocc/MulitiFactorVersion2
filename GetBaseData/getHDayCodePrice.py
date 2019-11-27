@@ -2,7 +2,7 @@
 import glob,pickle
 
 
-def main():
+def main(year=None):
     sFile = sorted(glob.glob('../Data/dayline/*'))
     def dealfunc(file):
         with open(file,'rb')as f:hCodeInfo=pickle.load(f)
